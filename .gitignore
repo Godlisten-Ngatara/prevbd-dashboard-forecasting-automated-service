@@ -1,0 +1,24 @@
+# Environment variables
+.env
+.env.*
+
+# Dependencies
+/node_modules
+
+# TypeScript build output
+/dist
+
+# OS generated files
+.DS_Store
+/.vscode
+*/ml_models
+# Test coverage
+/coverage
+
+.eslintcache
+
+*.csv
+*.graph
+.RData
+.Rhistory
+/src/assets/shapes
