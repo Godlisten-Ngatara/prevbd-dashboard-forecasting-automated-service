@@ -1,11 +1,18 @@
-import forecastQueue from "../utils/queue.js";
+import addJob from "#utils/queue.js";
+import { Step } from "#types/index.js";
 import { Request, Response } from "express";
-import { getClimateData  } from "../utils/dhis2Client.js";
 export const createForecastJob = async (req: Request, res: Response) => {
   try {
     const { startDate, endDate } = req.body || {};
 
-    const job = await forecastQueue.add("forecastJob", { startDate, endDate });
+    const job = await addJob({
+      name: "forecast",
+      jobData: {
+        from: startDate,
+        to: endDate
+      },
+      step: Step.INITIAL
+    });
 
     res.status(200).json({
       message: "Job queued successfully",
@@ -17,4 +24,4 @@ export const createForecastJob = async (req: Request, res: Response) => {
       error: err instanceof Error ? err.message : String(err),
     });
   }
-}
+};

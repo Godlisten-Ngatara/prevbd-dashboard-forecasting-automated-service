@@ -1,9 +1,8 @@
 import {
   organizationUnitsMetaData,
   dataElementsMetaData,
-} from "./dhis2MetaData.js";
-import { jsonToCsv } from "./helpers.js";
-import { getPeriods } from "./helpers.js";
+} from "../utils/dhis2MetaData.js";
+import { getPeriods } from "#utils/helpers.js";
 const baseUrl =
   process.env.PREVBD_BASE_API_URI || "https://prevbd.org/prevbd/api";
 
@@ -51,18 +50,11 @@ export const getClimateData = async (startDate: string, endDate: string) => {
         `Error fetching data: ${response.status} ${response.statusText} \nURL: ${targetUrl}`
       );
     }
-
     const data: any = await response.json();
-
-    const { filePath, csvOutput_entData, csvOutput_cliData } = jsonToCsv(data);
-    console.log(`Climate data saved to ${filePath}`);
+    console.log(data);
     return data;
   } catch (error) {
     console.error("Fetch error:", error);
     throw error;
   }
-};
-
-export const importData = async () => {
-  const endpoint = "";
 };
