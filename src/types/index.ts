@@ -20,5 +20,41 @@ export enum Step {
   THIRD,
   FOURTH,
   FIFTH,
-  FINAL
+  SIXTH,
+  FINAL,
 }
+
+export type ModelRes = {
+  District: string;
+  month: string;
+  year: string;
+  Forecasted: number;
+};
+export type DhisImportFormat = {
+  dataElement: string;
+  value: number;
+  orgUnit: string;
+  period: string;
+};
+export type Dhis2ImportData = {
+  dataValues: DhisImportFormat[];
+};
+
+export interface OrgUnit {
+  id: string
+  code: string
+  name: string
+  level?: number
+  parent?: {
+    id: string
+    code: string
+    name: string
+  }
+  District_ID?: string
+}
+
+export type OrgUnitResponse = {
+  organisationUnits: OrgUnit[]
+}
+
+

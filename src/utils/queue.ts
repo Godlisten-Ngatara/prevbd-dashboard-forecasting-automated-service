@@ -2,7 +2,7 @@ import { Job, Queue } from "bullmq";
 import { Step } from "#types/index.js";
 import redisConn from "../config/redisConn.js";
 
-const forecastQueue = new Queue("forecastQueue", {
+export const forecastQueue = new Queue("forecastQueue", {
   connection: redisConn,
 });
 
