@@ -8,26 +8,26 @@ import { formatModelRes } from "#jobs/formatModelResults.js";
 import { importForecastedResults } from "#jobs/importForecastedData.js";
 import { runAnalytics } from "#jobs/runAnalytics.js";
 import { getOrgUnits } from "#jobs/getOrgUnits.js";
+import getLogger from "../../logger.js";
 const processJob = async (job: Job) => {
   let step = job.data.step;
-  console.log(step);
+  const jobLogger = getLogger(job.id || "");
+  jobLogger.info(`Job with id ${job.id} has started`);
 
   while (step != Step.FINAL) {
     switch (step) {
       case Step.INITIAL:
         {
-          const orgUnits = await getOrgUnits(
-            job.data.jobData.orgUnit
-          );
+          const orgUnits = await getOrgUnits(job.data.jobData.orgUnit, jobLogger);
           await job.updateData({
             jobData: {
               orgUnits: orgUnits,
               from: job.data.jobData.from,
-              to: job.data.jobData.to
+              to: job.data.jobData.to,
             },
-            step: Step.THIRD,
+            step: Step.SECOND,
           });
-          step = Step.THIRD;
+          step = Step.SECOND;
         }
         break;
       case Step.SECOND:
@@ -35,7 +35,8 @@ const processJob = async (job: Job) => {
           const cliData = await getClimateData(
             job.data.jobData.from,
             job.data.jobData.to,
-            job.data.jobData.orgUnits
+            job.data.jobData.orgUnits,
+            jobLogger
           );
           await job.updateData({
             jobData: cliData,
@@ -46,7 +47,7 @@ const processJob = async (job: Job) => {
         break;
       case Step.THIRD:
         {
-          const formattedData = await formatDhis2Data(job.data.jobData);
+          const formattedData = await formatDhis2Data(job.data.jobData, jobLogger);
           await job.updateData({
             jobData: formattedData,
             step: Step.FOURTH,
@@ -56,10 +57,7 @@ const processJob = async (job: Job) => {
         break;
       case Step.FOURTH:
         {
-          const modelRes = await getForecastedAbundance(
-            job.data.jobData.csvOutput_cliData,
-            job.data.jobData.csvOutput_entData
-          );
+          const modelRes = await getForecastedAbundance(job.data.jobData, jobLogger);
           await job.updateData({
             jobData: modelRes,
             step: Step.FIFTH,
@@ -69,10 +67,7 @@ const processJob = async (job: Job) => {
         break;
       case Step.FIFTH:
         {
-          const formattedModelRes = formatModelRes(
-            job.data.jobData.forecasted_results
-          );
-          console.log(formattedModelRes);
+          const formattedModelRes = formatModelRes(job.data.jobData, jobLogger);
 
           await job.updateData({
             jobData: formattedModelRes,
@@ -81,27 +76,30 @@ const processJob = async (job: Job) => {
           step = Step.SIXTH;
         }
         break;
-      case Step.SIXTH: {
-        console.log("job.data.jobData before import:", job.data.jobData);
-
-        await importForecastedResults(job.data.jobData);
-
-        await job.updateData({ step: Step.FINAL });
-        step = Step.FINAL;
-      }
-
-      case Step.FINAL:
+      case Step.SIXTH:
         {
-          console.log("hello 2");
+          console.log("job.data.jobData before import:", job.data.jobData);
 
-          await runAnalytics();
+          const res = await importForecastedResults(job.data.jobData, jobLogger);
+          if (!res.successful) {
+            throw new Error(`Import failed: ${res.message}`);
+          }
+          await job.updateData({ step: Step.FINAL });
+          step = Step.FINAL;
         }
         break;
       default:
         break;
     }
   }
-  return "Done";
+  if (step === Step.FINAL) {
+    await runAnalytics(jobLogger);
+    return {
+      successful: true,
+      status: "Completed",
+      message: `Job with id ${job.id} completed successfully`,
+    };
+  }
 };
 export const startForecastWorker = () => {
   const forecastWorker = new Worker("forecastQueue", processJob, {
@@ -115,8 +113,4 @@ export const startForecastWorker = () => {
     console.error("Stack:", err.stack);
     console.error("Job data:", job?.data);
   });
-
-  // forecastWorker.on("completed", () => {
-  //   console.log("completed");
-  // });
 };

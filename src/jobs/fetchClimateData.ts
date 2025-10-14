@@ -4,15 +4,20 @@ import {
 } from "../utils/dhis2MetaData.js";
 import { getPeriods } from "#utils/helpers.js";
 import { OrgUnitResponse } from "#types/index.js";
+import { response } from "express";
+import logger from "../../logger.js";
 const baseUrl =
   process.env.PREVBD_BASE_API_URI || "https://prevbd.org/prevbd/api";
 
 export const getClimateData = async (
   startDate: string,
   endDate: string,
-  orgUnits: OrgUnitResponse
+  orgUnits: OrgUnitResponse,
+  jobLogger: any
 ) => {
   const { organisationUnits } = orgUnits;
+  // console.log(organisationUnits);
+
   const endpoint = "/analytics.json";
   const periods = getPeriods(startDate, endDate);
   const periodString = periods.join(";");
@@ -22,9 +27,6 @@ export const getClimateData = async (
     organisationUnits.length > 1
       ? organisationUnits?.map((ou) => ou.id).join(";")
       : organisationUnits?.map((ou) => ou.id).toString();
-  console.log(orgUnitsString);
-
-  console.log(`Fetching data for periods: ${periodString}`);
 
   const queryParams = {
     dimension: [
@@ -42,14 +44,11 @@ export const getClimateData = async (
       return `${key}=${encodeURIComponent(value)}`;
     })
     .join("&");
-  console.log(queryString);
-  console.log(orgUnits);
-  
-  
 
   const targetUrl = `${baseUrl}/${endpoint}?${queryString}`;
   try {
     // Specify basic authentication headers if required by the API
+    jobLogger.info(`Getting climate data from DHIS2 API...`);
     const response = await fetch(targetUrl, {
       method: "GET",
       headers: {
@@ -65,23 +64,24 @@ export const getClimateData = async (
       );
     }
     const data: any = await response.json();
-    console.log(data);
-
-    return { orgUnits: organisationUnits, data: data };
+    // console.log(data);
+    if (data?.rows.length === 0) {
+      throw new Error(`No climate data found for the specified period`);
+      
+    }
+    return {
+      successful: true,
+      data: {
+        orgUnits: organisationUnits,
+        climate: data,
+      },
+    };
   } catch (error) {
-    console.error("Fetch error:", error);
-    throw error;
+    jobLogger.info(error,`No climate data found for the specified period`);
+    return {
+      successful: false,
+      status: response?.status(500),
+      message: error instanceof Error ? error.message : "unknown error",
+    };
   }
 };
-
-//  test this function
-(async () => {
-  const orgUnits = {
-    organisationUnits: [
-      { id: "Nyd7qIdoR4R", code: "MZ-PE", name: "Pemba" },
-      { id: "eCeku5fUWg8", code: "MZ-NI", name: "Nampula" },
-    ],
-  };
-  const result = await getClimateData("202201", "202212", orgUnits);
-  console.log(JSON.stringify(result, null, 2));
-})();

@@ -5,11 +5,10 @@ const endpoint = "/dataValueSets";
 
 const targetUrl = `${baseUrl}${endpoint}`;
 export const importForecastedResults = async (
-  forecastedResults: Dhis2ImportData
+  forecastedResults: Dhis2ImportData, jobLogger: any
 ) => {
   try {
-    console.log(targetUrl);
-    console.log(JSON.stringify(forecastedResults))
+    jobLogger.info(`Importing forecasted results to DHIS2...`);
     const res = await fetch(targetUrl, {
       method: "POST",
        headers: {
@@ -23,20 +22,26 @@ export const importForecastedResults = async (
     if (!res.ok) {
       throw new Error("API request failed");
     }
-    const result = res.json()
-    const status = res.status
-    console.log("import result: ", result);
-    console.log("import status: ", status);
+    const result: any = await res.json()
+    const statusCode = result.httpStatusCode
+    const successMes = result.response?.description
+    const failReason = result.response.conflicts?.[0]?.value || "Unknown reason"
+    if (statusCode !== 200) {
+      throw new Error("Importing forecasted data failed", {cause: failReason});
+    }
     return {
-      status: "succesfull",
-      message: "message"
+      successful: true,
+      status: "successful",
+      message: successMes,
+      result
     };
   } catch (error: any) {
-    console.error((error as Error).stack);
-    
+    jobLogger.error(error, "Error importing forecasted results to DHIS2");
     return {
+      successful: false,
       status: "Failed",
-      message: error.message,
+      message: error instanceof Error ? error.message : "unknown error",
+      reason: error?.cause
     };
   }
 };

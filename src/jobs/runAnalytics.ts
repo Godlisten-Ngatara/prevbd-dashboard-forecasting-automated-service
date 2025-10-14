@@ -4,9 +4,8 @@ const baseUrl = process.env.PREVBD_BASE_API_URI ?? "";
 const endpoint = "/resourceTables/analytics";
 
 const targetUrl = `${baseUrl}${endpoint}`;
-export const runAnalytics = async () => {
-  console.log("hey");
-
+export const runAnalytics = async (jobLogger: any) => {
+  jobLogger.info(`Running Analytics Tables...`);
   try {
     const res = await fetch(targetUrl, {
       method: "POST",
@@ -16,22 +15,27 @@ export const runAnalytics = async () => {
         ).toString("base64")}`,
       },
     });
-    const result = res.text()
-    const status = res.status
-    console.log("analytics result: ", result);
-    console.log("status: ", status);
-    if (!res.ok) {
-      throw new Error("Run Analytics failed");
+    const result: any = await res.json();
+    const statusCode = result.httpStatusCode;
+    const failReason = result.message
+    if (statusCode !== 200) {
+      throw new Error("Analytics failed", {
+        cause: failReason,
+      });
     }
-    console.log("excellent");
-
     return {
-      status: "succesfull",
+      successful: true,
+      status: "Successful",
+      message: "Analytics Tables run successfully",
+      result,
     };
   } catch (error: any) {
+    jobLogger.info(error, "Error running Analytics Tables");
     return {
+      successful: false,
       status: "Failed",
-      message: error.message,
+      message: error instanceof Error ? error.message : "unknown error",
+      reason: error?.cause,
     };
   }
 };

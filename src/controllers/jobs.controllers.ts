@@ -5,6 +5,8 @@ export const createForecastJob = async (req: any, res: any) => {
   try {
     const { startDate, endDate, orgUnit, name } = req.body || {};
 
+
+
     const job = await addJob({
       name: name,
       jobData: {
@@ -20,7 +22,7 @@ export const createForecastJob = async (req: any, res: any) => {
       data: {
         id: job.id,
         name: job.name,
-        created: job.timestamp,
+        created: job.timestamp.toString().split(".").pop(),
         status: await forecastQueue.getJobState(job?.id || "pending"),
       },
     });

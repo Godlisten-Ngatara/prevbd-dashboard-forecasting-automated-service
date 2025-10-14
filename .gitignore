@@ -22,3 +22,10 @@
 .RData
 .Rhistory
 /src/assets/shapes
+
+# log files
+/logs/*
+*.log
+
+# test files
+**/__tests__/
