@@ -11,5 +11,14 @@ export type EntomologyDataRecord = {
   District_ID: number;
   year: number;
   month: number;
-  all_ano: number | string
+  all_ano: number | string;
 };
+
+export enum Step {
+  INITIAL,
+  SECOND,
+  THIRD,
+  FOURTH,
+  FIFTH,
+  FINAL
+}

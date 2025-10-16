@@ -1,32 +1,82 @@
-import { Worker } from "bullmq";
+import { Job, Worker } from "bullmq";
 import redisConn from "../config/redisConn.js";
-import { getClimateData } from "./dhis2Client.js";
+import { getClimateData } from "#jobs/fetchClimateData.js";
+import { formatDhis2Data } from "#jobs/formatDhis2Data.js";
+import { getForecastedAbundance } from "#jobs/fetchForecastedData.js";
+import { Step } from "#types/index.js";
+import { formatModelRes } from "#jobs/formatModelResults.js";
+const processJob = async (job: Job) => {
+  let step = job.data.step;
+  console.log(step);
+  
+  while (step != Step.FINAL) {
+    console.log(`Processing step ${step}`);
 
-export const startForecastWorker = () => {
-  const forecastWorker = new Worker(
-    "forecastQueue",
-    async (job) => {
-      console.log(`Processing job ${job.id} with data:`, job.data);
-      if (!job.data.startDate || !job.data.endDate) {
-        throw new Error("Missing startDate or endDate in job data");
-      }
-      try {
-        const climateData = await getClimateData(
-          job.data.startDate,
-          job.data.endDate
-        );
-        console.log({
-          message: `Job ${job.id} completed.`,
-          data: JSON.stringify(climateData, null, 2),
-        });
-        return { result: "success" };
-      } catch (error) {
-        console.error(`Error processing job ${job.id}:`, error);
-        throw new Error(`Failed to process job ${job.id}`);
-      }
-    },
-    {
-      connection: redisConn,
+    switch (step) {
+      case Step.INITIAL:
+        {
+          const cliData = await getClimateData(
+            job.data.jobData.from,
+            job.data.jobData.to
+          );
+          await job.updateData({
+            jobData: cliData,
+            step: Step.SECOND,
+          });
+          step = Step.SECOND;
+        }
+        break;
+      case Step.SECOND:
+        {
+          const formattedData = await formatDhis2Data(job.data.jobData);
+          await job.updateData({
+            jobData: formattedData,
+            step: Step.THIRD,
+          });
+          step = Step.THIRD;
+        }
+        break;
+      case Step.THIRD:
+        {
+          const modelRes = await getForecastedAbundance(
+            job.data.jobData.csvOutput_cliData,
+            job.data.jobData.csvOutput_entData
+          );
+          await job.updateData({
+            jobData: modelRes,
+            step: Step.FOURTH,
+          });
+          step = Step.FOURTH;
+        }
+        break;
+      case Step.FOURTH:
+        {
+          const formattedModelRes = await formatModelRes(
+            job.data.jobData.forecasted_results
+          );
+          await job.updateData({
+            jobData: formattedModelRes,
+            step: Step.FIFTH,
+          });
+          step = Step.FIFTH;
+        }
+        break;
+      default:
+        break;
     }
-  );
+  }
+};
+export const startForecastWorker = () => {
+  const forecastWorker = new Worker("forecastQueue", processJob, {
+    connection: redisConn,
+  });
+  forecastWorker.on("progress", (job, err) => {
+    console.log("In progress");
+  });
+  forecastWorker.on("completed", () => {
+    console.log("completed");
+  });
+  forecastWorker.on("failed", () => {
+    console.log("Failed");
+  });
 };
