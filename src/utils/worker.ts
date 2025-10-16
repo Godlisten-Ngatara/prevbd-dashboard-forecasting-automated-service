@@ -5,22 +5,26 @@ import { formatDhis2Data } from "#jobs/formatDhis2Data.js";
 import { getForecastedAbundance } from "#jobs/fetchForecastedData.js";
 import { Step } from "#types/index.js";
 import { formatModelRes } from "#jobs/formatModelResults.js";
+import { importForecastedResults } from "#jobs/importForecastedData.js";
+import { runAnalytics } from "#jobs/runAnalytics.js";
+import { getOrgUnits } from "#jobs/getOrgUnits.js";
+import getLogger from "../../logger.js";
 const processJob = async (job: Job) => {
   let step = job.data.step;
-  console.log(step);
-  
-  while (step != Step.FINAL) {
-    console.log(`Processing step ${step}`);
+  const jobLogger = getLogger(job.id || "");
+  jobLogger.info(`Job with id ${job.id} has started`);
 
+  while (step != Step.FINAL) {
     switch (step) {
       case Step.INITIAL:
         {
-          const cliData = await getClimateData(
-            job.data.jobData.from,
-            job.data.jobData.to
-          );
+          const orgUnits = await getOrgUnits(job.data.jobData.orgUnit, jobLogger);
           await job.updateData({
-            jobData: cliData,
+            jobData: {
+              orgUnits: orgUnits,
+              from: job.data.jobData.from,
+              to: job.data.jobData.to,
+            },
             step: Step.SECOND,
           });
           step = Step.SECOND;
@@ -28,9 +32,14 @@ const processJob = async (job: Job) => {
         break;
       case Step.SECOND:
         {
-          const formattedData = await formatDhis2Data(job.data.jobData);
+          const cliData = await getClimateData(
+            job.data.jobData.from,
+            job.data.jobData.to,
+            job.data.jobData.orgUnits,
+            jobLogger
+          );
           await job.updateData({
-            jobData: formattedData,
+            jobData: cliData,
             step: Step.THIRD,
           });
           step = Step.THIRD;
@@ -38,12 +47,9 @@ const processJob = async (job: Job) => {
         break;
       case Step.THIRD:
         {
-          const modelRes = await getForecastedAbundance(
-            job.data.jobData.csvOutput_cliData,
-            job.data.jobData.csvOutput_entData
-          );
+          const formattedData = await formatDhis2Data(job.data.jobData, jobLogger);
           await job.updateData({
-            jobData: modelRes,
+            jobData: formattedData,
             step: Step.FOURTH,
           });
           step = Step.FOURTH;
@@ -51,19 +57,48 @@ const processJob = async (job: Job) => {
         break;
       case Step.FOURTH:
         {
-          const formattedModelRes = await formatModelRes(
-            job.data.jobData.forecasted_results
-          );
+          const modelRes = await getForecastedAbundance(job.data.jobData, jobLogger);
           await job.updateData({
-            jobData: formattedModelRes,
+            jobData: modelRes,
             step: Step.FIFTH,
           });
           step = Step.FIFTH;
         }
         break;
+      case Step.FIFTH:
+        {
+          const formattedModelRes = formatModelRes(job.data.jobData, jobLogger);
+
+          await job.updateData({
+            jobData: formattedModelRes,
+            step: Step.SIXTH,
+          });
+          step = Step.SIXTH;
+        }
+        break;
+      case Step.SIXTH:
+        {
+          console.log("job.data.jobData before import:", job.data.jobData);
+
+          const res = await importForecastedResults(job.data.jobData, jobLogger);
+          if (!res.successful) {
+            throw new Error(`Import failed: ${res.message}`);
+          }
+          await job.updateData({ step: Step.FINAL });
+          step = Step.FINAL;
+        }
+        break;
       default:
         break;
     }
+  }
+  if (step === Step.FINAL) {
+    await runAnalytics(jobLogger);
+    return {
+      successful: true,
+      status: "Completed",
+      message: `Job with id ${job.id} completed successfully`,
+    };
   }
 };
 export const startForecastWorker = () => {
@@ -73,10 +108,9 @@ export const startForecastWorker = () => {
   forecastWorker.on("progress", (job, err) => {
     console.log("In progress");
   });
-  forecastWorker.on("completed", () => {
-    console.log("completed");
-  });
-  forecastWorker.on("failed", () => {
-    console.log("Failed");
+  forecastWorker.on("failed", (job, err) => {
+    console.error(`Job ${job?.id} failed:`, err.message);
+    console.error("Stack:", err.stack);
+    console.error("Job data:", job?.data);
   });
 };

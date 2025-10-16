@@ -5,7 +5,11 @@ import {
   organizationUnitsMetaData,
   dataElementsMetaData,
 } from "./dhis2MetaData.js";
-import { ClimateDataRecord, EntomologyDataRecord } from "#types/index.js";
+import {
+  ClimateDataRecord,
+  EntomologyDataRecord,
+  OrgUnitResponse,
+} from "#types/index.js";
 
 export const getPeriods = (startDate: string, endDate: string): string[] => {
   const startDt = parseInt(startDate, 10);
@@ -25,3 +29,9 @@ export const getPeriods = (startDate: string, endDate: string): string[] => {
   }
   return periods;
 };
+
+// export const getOrgUnitsById = (orgUnits: OrgUnitResponse) => {
+//   const { organisationUnits } = orgUnits;
+
+//   const mappedId = organisationUnits.map((ou) => ou.code).find((ou) => {return organizationUnitsMetaData.map((ou) => ou.}))
+// };
