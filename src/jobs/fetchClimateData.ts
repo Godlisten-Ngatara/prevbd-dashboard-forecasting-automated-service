@@ -78,10 +78,6 @@ export const getClimateData = async (
     };
   } catch (error) {
     jobLogger.info(error,`No climate data found for the specified period`);
-    return {
-      successful: false,
-      status: response?.status(500),
-      message: error instanceof Error ? error.message : "unknown error",
-    };
+    throw error
   }
 };

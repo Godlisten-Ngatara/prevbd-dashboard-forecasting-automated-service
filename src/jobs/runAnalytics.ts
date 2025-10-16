@@ -31,11 +31,6 @@ export const runAnalytics = async (jobLogger: any) => {
     };
   } catch (error: any) {
     jobLogger.info(error, "Error running Analytics Tables");
-    return {
-      successful: false,
-      status: "Failed",
-      message: error instanceof Error ? error.message : "unknown error",
-      reason: error?.cause,
-    };
+    throw error
   }
 };

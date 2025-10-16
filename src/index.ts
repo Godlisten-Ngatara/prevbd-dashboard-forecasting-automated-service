@@ -11,8 +11,8 @@ const port = process.env.PORT ?? "9001";
 app.use(json());
 app.use(cors())
 app.use("/api/v1", jobsRouter);
-app.use("/api/v1", eventsRouter)
-app.use("/api/v1", logsRouter)
+app.use("/api/v1", eventsRouter);
+app.use("/api/v1", logsRouter);
 startForecastWorker();
 app.listen(port, () => {
   console.log(`Server is listening at port ${port}`);

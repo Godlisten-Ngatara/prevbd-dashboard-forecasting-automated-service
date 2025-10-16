@@ -61,6 +61,7 @@ export const getForecastedAbundance = async (
     } catch (e: any) {
       jobLogger.info(e, `Error fetching forecasted data for ${parentKey}`);
       results.push({ parent: parent, error: e.message });
+      throw e;
     }
   }
 

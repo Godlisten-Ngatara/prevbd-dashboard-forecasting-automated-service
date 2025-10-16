@@ -37,11 +37,6 @@ export const importForecastedResults = async (
     };
   } catch (error: any) {
     jobLogger.error(error, "Error importing forecasted results to DHIS2");
-    return {
-      successful: false,
-      status: "Failed",
-      message: error instanceof Error ? error.message : "unknown error",
-      reason: error?.cause
-    };
+    throw error
   }
 };

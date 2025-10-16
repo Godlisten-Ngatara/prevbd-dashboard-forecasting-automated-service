@@ -5,8 +5,6 @@ export const createForecastJob = async (req: any, res: any) => {
   try {
     const { startDate, endDate, orgUnit, name } = req.body || {};
 
-
-
     const job = await addJob({
       name: name,
       jobData: {
@@ -36,7 +34,14 @@ export const createForecastJob = async (req: any, res: any) => {
 
 export const getJobs = async (req: Request, res: Response) => {
   try {
-    const jobs = await forecastQueue.getJobs(["active", "completed", "delayed", "failed", "paused", "waiting", ]);
+    const jobs = await forecastQueue.getJobs([
+      "active",
+      "completed",
+      "delayed",
+      "failed",
+      "paused",
+      "waiting",
+    ]);
 
     // 3️⃣ Map each job to a clean JSON structure with metadata + status
     const formattedJobs = await Promise.all(
@@ -55,6 +60,10 @@ export const getJobs = async (req: Request, res: Response) => {
           endedAt: json.finishedOn
             ? new Date(json.finishedOn).toISOString()
             : null,
+          duration:
+            json.finishedOn && json.processedOn
+              ? Math.floor((json.finishedOn - json.processedOn) / 1000)
+              : null,
           attemptsMade: job.attemptsMade,
           progress: job.progress,
           data: job.data, // input payload
@@ -113,5 +122,23 @@ export const getPredictions = async (req: any, res: any) => {
   } catch (err) {
     console.error("Error retrieving completed jobs:", err);
     res.status(500).json({ error: "Failed to retrieve completed jobs" });
+  }
+};
+
+export const deleteJobById = async (req: any, res: any) => {
+  try {
+    const jobId = req.params.jobId;
+
+    // Find the job by ID and remove it from the queue
+    const job = await forecastQueue.getJob(jobId);
+    if (!job) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+
+    await job.remove();
+
+    res.status(200).json({ message: "Job deleted successfully" });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to delete job", stack: err });
   }
 };
